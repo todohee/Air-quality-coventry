@@ -1,0 +1,244 @@
+import pygame
+import paho.mqtt.client as mqtt
+import threading
+from collections import deque
+import math
+
+# -------------------------
+# PYGAME SETUP
+# -------------------------
+
+pygame.init()
+WIDTH, HEIGHT = 1000, 650
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Smart Room Air Monitor")
+
+font = pygame.font.SysFont("Segoe UI", 26)
+bigfont = pygame.font.SysFont("Segoe UI", 50)
+
+# Colors
+BG = (25,25,30)
+WHITE = (240,240,240)
+GRAY = (90,90,100)
+
+GREEN = (80,220,120)
+YELLOW = (255,200,50)
+RED = (255,90,90)
+BLUE = (90,150,255)
+
+# -------------------------
+# SENSOR DATA
+# -------------------------
+
+temperature = 0
+humidity = 0
+co2 = 0
+vent_state = "OFF"
+
+co2_history = deque(maxlen=60)
+
+# -------------------------
+# MQTT SETUP
+# -------------------------
+
+BROKER = "broker.hivemq.com"
+
+def on_message(client, userdata, msg):
+    global temperature, humidity, co2
+
+    try:
+        value = float(msg.payload.decode())
+
+        if msg.topic == "room/temperature":
+            temperature = value
+
+        elif msg.topic == "room/humidity":
+            humidity = value
+
+        elif msg.topic == "room/co2":
+            co2 = value
+            co2_history.append(value)
+
+    except:
+        pass
+
+
+client = mqtt.Client()
+client.on_message = on_message
+client.connect(BROKER,1883,60)
+
+client.subscribe("room/temperature")
+client.subscribe("room/humidity")
+client.subscribe("room/co2")
+
+threading.Thread(target=client.loop_forever, daemon=True).start()
+
+# -------------------------
+# AIR QUALITY STATUS
+# -------------------------
+
+def air_quality():
+
+    if co2 < 800:
+        return "GOOD", GREEN
+
+    elif co2 < 1200:
+        return "MODERATE", YELLOW
+
+    else:
+        return "BAD", RED
+
+
+# -------------------------
+# SENSOR BAR
+# -------------------------
+
+def draw_bar(label,value,max_value,y,color):
+
+    pygame.draw.rect(screen,GRAY,(80,y,300,35))
+
+    width = int((value/max_value)*300)
+    pygame.draw.rect(screen,color,(80,y,width,35))
+
+    text = font.render(f"{label}: {value}",True,WHITE)
+    screen.blit(text,(80,y-30))
+
+
+# -------------------------
+# CO2 GRAPH
+# -------------------------
+
+def draw_graph():
+
+    x = 450
+    y = 400
+    width = 500
+    height = 180
+
+    pygame.draw.rect(screen,GRAY,(x,y,width,height),2)
+
+    if len(co2_history) < 2:
+        return
+
+    step = width / len(co2_history)
+
+    points = []
+
+    for i,val in enumerate(co2_history):
+
+        px = x + i * step
+        py = y + height - (val/2000)*height
+        points.append((px,py))
+
+    pygame.draw.lines(screen,BLUE,False,points,3)
+
+
+# -------------------------
+# AIR QUALITY GAUGE
+# -------------------------
+
+def draw_gauge():
+
+    center = (700,200)
+    radius = 100
+
+    status,color = air_quality()
+
+    pygame.draw.circle(screen,GRAY,center,radius,8)
+
+    angle = (co2/2000)*180
+
+    needle_angle = math.radians(180-angle)
+
+    x = center[0] + math.cos(needle_angle)*80
+    y = center[1] - math.sin(needle_angle)*80
+
+    pygame.draw.line(screen,color,center,(x,y),6)
+
+    text = bigfont.render(status,True,color)
+    screen.blit(text,(630,300))
+
+
+# -------------------------
+# AUTO VENT CONTROL
+# -------------------------
+
+def auto_control():
+
+    global vent_state
+
+    if co2 > 1200 and vent_state == "OFF":
+        client.publish("room/vent/control","ON")
+        vent_state = "ON"
+
+    if co2 < 700 and vent_state == "ON":
+        client.publish("room/vent/control","OFF")
+        vent_state = "OFF"
+
+
+# -------------------------
+# BUTTONS
+# -------------------------
+
+vent_on = pygame.Rect(450,580,120,45)
+vent_off = pygame.Rect(600,580,120,45)
+
+# -------------------------
+# MAIN LOOP
+# -------------------------
+
+clock = pygame.time.Clock()
+
+running = True
+
+while running:
+
+    screen.fill(BG)
+
+    for event in pygame.event.get():
+
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+
+            if vent_on.collidepoint(event.pos):
+                client.publish("room/vent/control","ON")
+                vent_state = "ON"
+
+            if vent_off.collidepoint(event.pos):
+                client.publish("room/vent/control","OFF")
+                vent_state = "OFF"
+
+
+    auto_control()
+
+    # Title
+    title = bigfont.render("Room Air Quality Monitor",True,WHITE)
+    screen.blit(title,(50,40))
+
+    # Sensor bars
+    draw_bar("Temperature (°C)",temperature,40,200,RED)
+    draw_bar("Humidity (%)",humidity,100,300,BLUE)
+    draw_bar("CO2 (ppm)",co2,2000,400,GREEN)
+
+    # Gauge
+    draw_gauge()
+
+    # Graph
+    draw_graph()
+
+    # Vent buttons
+    pygame.draw.rect(screen,GREEN,vent_on)
+    pygame.draw.rect(screen,RED,vent_off)
+
+    screen.blit(font.render("VENT ON",True,BLUE),(460,590))
+    screen.blit(font.render("VENT OFF",True,GREEN),(605,590))
+
+    vent_text = font.render(f"Vent State: {vent_state}",True,WHITE)
+    screen.blit(vent_text,(760,590))
+
+    pygame.display.update()
+    clock.tick(60)
+
+pygame.quit()
