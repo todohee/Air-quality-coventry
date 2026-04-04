@@ -8,9 +8,10 @@ pygame.init()
 
 WIDTH, HEIGHT = 1200, 750
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Smart Building Air Monitor")
+pygame.display.set_caption("Smart Building Environment Monitor")
 
 clock = pygame.time.Clock()
+
 font = pygame.font.SysFont("Segoe UI", 20)
 bigfont = pygame.font.SysFont("Segoe UI", 34)
 
@@ -27,18 +28,20 @@ RED = (255,90,90)
 BLUE = (90,150,255)
 GRAY = (80,80,90)
 
-
-# ROOMS
-
+# ROOMS (UPDATED SENSORS)
 rooms = {
-    "room1":{"temp":0,"hum":0,"co2":0},
-    "room2":{"temp":0,"hum":0,"co2":0},
-    "room3":{"temp":0,"hum":0,"co2":0},
-    "room4":{"temp":0,"hum":0,"co2":0}
+    "room1":{"temp":0,"co2":0,"dust":0,"water":0},
+    "room2":{"temp":0,"co2":0,"dust":0,"water":0},
+    "room3":{"temp":0,"co2":0,"dust":0,"water":0},
+    "room4":{"temp":0,"co2":0,"dust":0,"water":0}
 }
+
 selected_room = "room1"
+
 co2_history = deque(maxlen=100)
+
 vent_state = "OFF"
+
 tabs = ["Floor Plan","Sensors","Graphs"]
 active_tab = "Floor Plan"
 
@@ -52,36 +55,61 @@ rooms_layout = {
 particles = []
 
 
-# SIMULATING SENSOR DATA
+#SENSOR SIMULATION 
+
+
 def simulate_sensors():
     while True:
         for room in rooms:
-            # Random temp 20-30°C
-            rooms[room]["temp"] = round(random.uniform(20, 30), 1)
-            # Random humidity 30-70%
-            rooms[room]["hum"] = round(random.uniform(30, 70), 1)
-            # Random CO2 400-1500 ppm
-            rooms[room]["co2"] = random.randint(400, 1500)
-            co2_history.append(rooms[room]["co2"])
-        time.sleep(2)  # update every 2 seconds
 
-# Start simulation in background thread
+            rooms[room]["temp"] = round(random.uniform(18, 30), 1)
+            rooms[room]["co2"] = random.randint(400, 1500)
+            rooms[room]["dust"] = random.randint(5, 150)     # µg/m³
+            rooms[room]["water"] = random.randint(0, 100)     # quality %
+
+            co2_history.append(rooms[room]["co2"])
+
+        time.sleep(2)
+
 threading.Thread(target=simulate_sensors, daemon=True).start()
 
 
 # AIR QUALITY
 
-def air_quality(co2):
-    if co2 < 800:
+
+def air_quality(data):
+
+    score = 0
+
+    # CO2
+    if data["co2"] < 800: score += 0
+    elif data["co2"] < 1200: score += 1
+    else: score += 2
+
+    # Dust
+    if data["dust"] < 50: score += 0
+    elif data["dust"] < 100: score += 1
+    else: score += 2
+
+    # Temperature
+    if 20 <= data["temp"] <= 26: score += 0
+    else: score += 1
+
+    # Water quality (lower = worse)
+    if data["water"] > 70: score += 0
+    elif data["water"] > 40: score += 1
+    else: score += 2
+
+    # Final status
+    if score <= 2:
         return "GOOD", GREEN
-    elif co2 < 1200:
+    elif score <= 5:
         return "MODERATE", YELLOW
     else:
         return "BAD", RED
 
 
 # DRAW FUNCTIONS
-
 def create_airflow():
     for i in range(3):
         particles.append([850,520+random.randint(-15,15),4])
@@ -94,7 +122,7 @@ def update_airflow():
 
 def draw_topbar():
     pygame.draw.rect(screen,TOPBAR,(0,0,WIDTH,50))
-    title = bigfont.render("Smart Building Air Monitor",True,WHITE)
+    title = bigfont.render("Smart Building Environment Monitor",True,WHITE)
     screen.blit(title,(20,10))
 
 def draw_tabs():
@@ -121,91 +149,159 @@ def draw_sidebar():
 def draw_workspace():
     pygame.draw.rect(screen,PANEL,(200,90,1000,660))
 
+# FLOOR PLAN
+
+
 def draw_floor_plan():
     for room,rect in rooms_layout.items():
         data = rooms[room]
-        status,color = air_quality(data["co2"])
+        status,color = air_quality(data)
+
         pygame.draw.rect(screen,color,rect,border_radius=8)
         pygame.draw.rect(screen,(0,0,0),rect,2)
+
         label = font.render(room.upper(),True,(0,0,0))
         screen.blit(label,(rect.x+10,rect.y+10))
+
         co2 = font.render(f"CO2:{data['co2']}",True,(0,0,0))
         screen.blit(co2,(rect.x+10,rect.y+40))
 
+
+#SENSOR PANEL 
+
+
 def draw_sensor_panel():
+
     data = rooms[selected_room]
+
     x=260; y=140
-    panel = pygame.Rect(x,y,450,250)
+
+    panel = pygame.Rect(x,y,500,300)
     pygame.draw.rect(screen,(55,55,65),panel,border_radius=10)
+
     title = bigfont.render(selected_room.upper(),True,WHITE)
     screen.blit(title,(x+20,y+20))
+
     screen.blit(font.render(f"Temperature: {data['temp']} °C",True,WHITE),(x+20,y+90))
-    screen.blit(font.render(f"Humidity: {data['hum']} %",True,WHITE),(x+20,y+120))
-    screen.blit(font.render(f"CO2: {data['co2']} ppm",True,WHITE),(x+20,y+150))
+    screen.blit(font.render(f"CO2: {data['co2']} ppm",True,WHITE),(x+20,y+120))
+    screen.blit(font.render(f"Dust: {data['dust']} ug/m3",True,WHITE),(x+20,y+150))
+    screen.blit(font.render(f"Water Quality: {data['water']}%",True,WHITE),(x+20,y+180))
+
+    status,color = air_quality(data)
+    screen.blit(font.render(f"Air Quality: {status}",True,color),(x+20,y+220))
+
+
+# GRAPH (CO2)
+
 
 def draw_graph():
     x,y=260,150; w,h=700,300
     pygame.draw.rect(screen,GRAY,(x,y,w,h),2)
+
     if len(co2_history)<2: return
+
     step=w/len(co2_history)
     points=[]
+
     for i,val in enumerate(co2_history):
         px=x+i*step
         py=y+h-(val/2000)*h
         points.append((px,py))
+
     pygame.draw.lines(screen,BLUE,False,points,3)
+
+
+# AUTO CONTROL
+
 
 def auto_control():
     global vent_state
-    co2 = rooms[selected_room]["co2"]
-    if co2>1200 and vent_state=="OFF":
+
+    data = rooms[selected_room]
+    status,_ = air_quality(data)
+
+    if status=="BAD":
         vent_state="ON"
-    if co2<700 and vent_state=="ON":
+    elif status=="GOOD":
         vent_state="OFF"
+
+
+# BUTTONS
+
 
 vent_on = pygame.Rect(850,680,120,40)
 vent_off = pygame.Rect(990,680,120,40)
 
 
-# MAIN LOOP
+#MAIN LOOP
+
 
 running=True
+
 while running:
+
     screen.fill(BG)
+
     for event in pygame.event.get():
-        if event.type==pygame.QUIT: running=False
+
+        if event.type==pygame.QUIT:
+            running=False
+
         if event.type==pygame.MOUSEBUTTONDOWN:
+
             mx,my=event.pos
-            # TAB CLICK
+
+            # Tabs
             if 200<mx<350 and 50<my<85: active_tab="Floor Plan"
             if 360<mx<510 and 50<my<85: active_tab="Sensors"
             if 520<mx<670 and 50<my<85: active_tab="Graphs"
-            # ROOM SELECT
+
+            # Room select
             y=120
             for room in rooms:
                 rect=pygame.Rect(20,y,160,40)
-                if rect.collidepoint(event.pos): selected_room=room
+                if rect.collidepoint(event.pos):
+                    selected_room=room
                 y+=60
-            # FLOOR PLAN ROOM CLICK
+
+            # Floor plan click
             for room,rect in rooms_layout.items():
-                if rect.collidepoint(event.pos): selected_room=room
-            # VENT BUTTONS
-            if vent_on.collidepoint(event.pos): vent_state="ON"
-            if vent_off.collidepoint(event.pos): vent_state="OFF"
+                if rect.collidepoint(event.pos):
+                    selected_room=room
+
+            # Vent buttons
+            if vent_on.collidepoint(event.pos):
+                vent_state="ON"
+            if vent_off.collidepoint(event.pos):
+                vent_state="OFF"
 
     auto_control()
-    draw_topbar(); draw_tabs(); draw_sidebar(); draw_workspace()
-    if active_tab=="Floor Plan": draw_floor_plan()
-    if active_tab=="Sensors": draw_sensor_panel()
-    if active_tab=="Graphs": draw_graph()
 
-    # AIRFLOW
-    if vent_state=="ON": create_airflow()
+    draw_topbar()
+    draw_tabs()
+    draw_sidebar()
+    draw_workspace()
+
+    if active_tab=="Floor Plan":
+        draw_floor_plan()
+
+    if active_tab=="Sensors":
+        draw_sensor_panel()
+
+    if active_tab=="Graphs":
+        draw_graph()
+
+    if vent_state=="ON":
+        create_airflow()
+
     update_airflow()
+
     pygame.draw.rect(screen,GREEN,vent_on)
     pygame.draw.rect(screen,RED,vent_off)
+
     screen.blit(font.render("VENT ON",True,(0,0,0)),(860,690))
     screen.blit(font.render("VENT OFF",True,(0,0,0)),(1000,690))
+
     label = font.render(f"Vent: {vent_state}",True,WHITE)
     screen.blit(label,(730,690))
 
