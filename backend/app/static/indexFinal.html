@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Smart Building Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  font-family: Arial;
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+  background: linear-gradient(135deg,#667eea,#764ba2);
+  color: white;
+}
+
+.room-card {
+  background: rgba(255,255,255,0.1);
+  border-radius: 15px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.sensor {
+  flex:1;
+  min-width:120px;
+  text-align:center;
+}
+
+.sensor-value {
+  font-size:2em;
+  font-weight:bold;
+}
+
+.good {color:#4CAF50;}
+.moderate {color:#FF9800;}
+.poor {color:#F44336;}
+.danger {color:#ff0000;}
+
+button {
+  padding:10px;
+  margin:5px;
+  border:none;
+  border-radius:20px;
+  background:rgba(255,255,255,0.2);
+  color:white;
+  cursor:pointer;
+}
+
+button:hover {
+  background:rgba(255,255,255,0.35);
+}
+
+canvas {
+  background:white;
+  border-radius:10px;
+  margin-top:20px;
+}
+
+/* ROOM VISUAL */
+#roomVisual {
+  width:100%;
+  height:300px;
+  border-radius:15px;
+  position:relative;
+  overflow:hidden;
+  margin-top:20px;
+}
+
+/* airflow animation */
+@keyframes flow {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(40px); }
+}
+</style>
+</head>
+
+<body>
+
+<h1> Smart Building Dashboard</h1>
+
+<div id="rooms"></div>
+<h2> Press the buttons above and an animation will pop at room visual below </h2>
+<h2> Live Charts</h2>
+<canvas id="co2Chart"></canvas>
+<canvas id="dustChart"></canvas>
+
+<h3> Room Simulation</h3>
+<div id="roomVisual"></div>
+
+<script>
+
+// STATE 
+
+let roomState = {
+  light:false,
+  window:false,
+  vent:false,
+  water:false,
+  alert:false
+};
+
+let co2Chart, dustChart;
+let labels = [];
+let co2Data = [];
+let dustData = [];
+const maxPoints = 20;
+
+//  STATUS 
+
+function getStatus(sensor,value){
+
+  if(sensor==="fire") return value ? "danger":"good";
+
+  if(sensor==="co2"){
+    if(value<800) return "good";
+    if(value<1200) return "moderate";
+    return "poor";
+  }
+
+  if(sensor==="dust"){
+    if(value<50) return "good";
+    if(value<100) return "moderate";
+    return "poor";
+  }
+
+  if(sensor==="temperature"){
+    return (value>=18 && value<=26) ? "good":"moderate";
+  }
+
+  if(sensor==="water"){
+    if(value>70) return "good";
+    if(value>40) return "moderate";
+    return "poor";
+  }
+
+  return "good";
+}
+
+function unit(s){
+  return {temperature:"°C",co2:"ppm",dust:"µg/m³",water:"%"}[s]||"";
+}
+
+function icon(s){
+  return {temperature:"🌡️",co2:"💨",dust:"🌫️",fire:"🔥",water:"💧"}[s];
+}
+
+//  SENSOR UI 
+
+function sensorHTML(sensor,val){
+
+  const status = getStatus(sensor,val);
+
+  return `
+    <div class="sensor">
+      <div>${icon(sensor)} ${sensor}</div>
+      <div class="sensor-value ${status}">
+        ${sensor==="fire" ? (val?"DETECTED":"SAFE") : (val ?? "-")+unit(sensor)}
+      </div>
+    </div>
+  `;
+}
+
+// CONTROLS 
+
+function controls(){
+  return `
+    <div>
+      <button onclick="cmd('vent')">🌬 Vent</button>
+      <button onclick="cmd('alert')">🚨 Alert</button>
+      <button onclick="cmd('light')">💡 Light</button>
+      <button onclick="cmd('window')">🪟 Window</button>
+      <button onclick="cmd('water')">💧 Valve</button>
+    </div>
+  `;
+}
+
+//  COMMAND HANDLER 
+
+function cmd(device){
+
+  if(device==="light") roomState.light = !roomState.light;
+  if(device==="window") roomState.window = !roomState.window;
+  if(device==="vent") roomState.vent = !roomState.vent;
+  if(device==="water") roomState.water = !roomState.water;
+
+  if(device==="alert"){
+    roomState.alert = true;
+    setTimeout(()=>roomState.alert=false,2000);
+  }
+
+  renderRoomVisual();
+
+  console.log("Command:",device);
+}
+
+//  ROOM VISUAL 
+
+function renderRoomVisual(){
+
+  const el = document.getElementById("roomVisual");
+
+  el.innerHTML = "";
+
+  // LIGHT
+  el.style.background = roomState.light ? "#f5e6a3" : "#2c2f3a";
+
+  // WINDOW
+  el.innerHTML += `
+    <div style="
+      position:absolute;
+      right:20px;
+      top:40px;
+      width:80px;
+      height:80px;
+      background:${roomState.window ? "#87CEEB" : "#444"};
+      border:3px solid white;
+      transform:${roomState.window ? "rotate(20deg)" : "rotate(0)"};
+      transition:0.3s;
+    "></div>
+  `;
+
+  // AIRFLOW
+  if(roomState.vent){
+    el.innerHTML += `
+      <div style="
+        position:absolute;
+        left:20px;
+        top:120px;
+        font-size:30px;
+        animation:flow 1s infinite linear;
+      ">💨💨💨</div>
+    `;
+  }
+
+  // WATER
+  el.innerHTML += `
+    <div style="
+      position:absolute;
+      bottom:20px;
+      left:20px;
+      font-size:18px;
+      color:${roomState.water ? "red":"lightblue"};
+    ">
+      💧 ${roomState.water ? "CLOSED":"OPEN"}
+    </div>
+  `;
+
+  // ALERT
+  if(roomState.alert){
+    el.innerHTML += `
+      <div style="
+        position:absolute;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        background:rgba(255,0,0,0.5);
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        font-size:40px;
+      ">
+        🚨 ALERT
+      </div>
+    `;
+  }
+}
+
+// CHARTS 
+
+function initCharts(){
+
+  co2Chart = new Chart(document.getElementById("co2Chart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"CO2",data:[]}]}
+  });
+
+  dustChart = new Chart(document.getElementById("dustChart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"Dust",data:[]}]}
+  });
+}
+
+function updateCharts(co2,dust){
+
+  const t = new Date().toLocaleTimeString();
+
+  labels.push(t);
+  co2Data.push(co2);
+  dustData.push(dust);
+
+  if(labels.length>maxPoints){
+    labels.shift();
+    co2Data.shift();
+    dustData.shift();
+  }
+
+  co2Chart.data.labels = labels;
+  co2Chart.data.datasets[0].data = co2Data;
+
+  dustChart.data.labels = labels;
+  dustChart.data.datasets[0].data = dustData;
+
+  co2Chart.update();
+  dustChart.update();
+}
+
+//  FETCH 
+
+async function fetchAndRender(){
+
+  const res = await fetch('/sensors');
+  const data = await res.json();
+
+  const container = document.getElementById("rooms");
+  container.innerHTML = "";
+
+  Object.keys(data).forEach(id=>{
+
+    const r = data[id];
+
+    container.innerHTML += `
+      <div class="room-card">
+        <h2>${id}</h2>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          ${sensorHTML("temperature",r.temperature)}
+          ${sensorHTML("co2",r.co2)}
+          ${sensorHTML("dust",r.dust)}
+          ${sensorHTML("water",r.water)}
+          ${sensorHTML("fire",r.fire)}
+        </div>
+
+        ${controls()}
+      </div>
+    `;
+
+    updateCharts(r.co2 || 0, r.dust || 0);
+  });
+}
+
+//  START 
+
+initCharts();
+renderRoomVisual();
+fetchAndRender();
+setInterval(fetchAndRender,2000);
+
+</script>
+
+</body>
+</html>
