@@ -38,7 +38,7 @@ Processed data is stored and evaluated
 Frontend displays results in real time
 ▶️ Getting Started
 Prerequisites
-Python 3.x
+Python 3
 MQTT Broker (e.g., Mosquitto)
 Node.js (optional for frontend)
 
