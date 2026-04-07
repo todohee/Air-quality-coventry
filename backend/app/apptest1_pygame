@@ -2,9 +2,9 @@ import pygame
 import paho.mqtt.client as mqtt
 import threading
 
-# -------------------------------
-# Initialize Pygame
-# -------------------------------
+
+# Initialize pygame
+
 pygame.init()
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -20,16 +20,15 @@ GREEN = (100, 255, 100)
 # Fonts
 font = pygame.font.SysFont("Arial", 36)
 
-# -------------------------------
-# Global Variables for Sensor Data
-# -------------------------------
+# Global variables for sensor data
+
 temperature = 0
 humidity = 0
 co2 = 0
 
-# -------------------------------
-# MQTT Callback
-# -------------------------------
+
+# MQTT callback
+
 def on_message(client, userdata, message):
     global temperature, humidity, co2
     topic = message.topic
@@ -44,9 +43,9 @@ def on_message(client, userdata, message):
     except:
         print(f"Invalid payload: {message.payload}")
 
-# -------------------------------
-# Connect to MQTT Broker
-# -------------------------------
+
+# Connect to MQTT broker
+
 MQTT_BROKER = "broker.hivemq.com"  
 client = mqtt.Client()
 client.on_message = on_message
@@ -60,11 +59,11 @@ client.subscribe("room1/co2")
 
 threading.Thread(target=client.loop_forever, daemon=True).start()
 
-# -------------------------------
+
 # Function to draw sensor bars
-# -------------------------------
+
 def draw_bars():
-    # Temperature bar
+    # Temperture bar
     pygame.draw.rect(screen, RED, (50, 150, temperature * 10, 40))
     temp_text = font.render(f"Temperature: {temperature:.1f}°C", True, BLACK)
     screen.blit(temp_text, (50, 100))
@@ -79,9 +78,9 @@ def draw_bars():
     co2_text = font.render(f"CO2: {co2:.0f} ppm", True, BLACK)
     screen.blit(co2_text, (50, 400))
 
-# -------------------------------
-# Main Pygame Loop
-# -------------------------------
+
+# Main pygame loop
+
 running = True
 while running:
     screen.fill(WHITE)
