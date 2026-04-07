@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Room Air Quality Monitor</title>
+<script src="https://unpkg.com/paho-mqtt@1.0.1/paho-mqtt.min.js"></script>
+
+<!-- maybe shift around the simulation-->
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white 
+   }
+.room-card {
+  background: rgba(255,255,255,0.1);
+  border-radius: 15px;
+  padding: 20px;
+  margin: 20px 0;
+  backdrop-filter: blur(10px);
+}
+.sensor-value {
+  font-size: 2.5em;
+  font-weight: bold;
+  margin: 10px 0;
+}
+.good { color: #4CAF50; }
+.moderate { color: #FF9800; }
+.poor { color: #F44336; }
+.status-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  margin: 5px;
+}
+.controls {
+  text-align: center;
+  margin: 20px 0;
+}
+button {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  margin: 0 10px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 16px;
+}
+button:hover { background: rgba(255,255,255,0.3); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.last-update {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+</style>
+</head>
+<body>
+<h1>🏠 Room Air Quality Monitor</h1>
+
+<div class="controls">
+<button id="connectBtn">Connect MQTT</button>
+<button id="testBtn" disabled>Simulate Data</button>
+<span id="connectionStatus">Disconnected</span>
+</div>
+
+<div id="rooms">
+<!-- Rooms will be populated dynamically -->
+</div>
+
+<script>
+// Simulated MQTT client, no real connection (note to self:clean up code)
+
+let mqttClient = {
+isConnected: false,
+connect: () => {
+mqttClient.isConnected = true;
+updateStatus('Connected ✓');
+document.getElementById('testBtn').disabled = false;
+
+// Simulate periodic test data
+setInterval(simulateSensorData, 5000);
+},
+subscribe: (topic) => console.log('Subscribed to:', topic),
+onMessageArrived: (message) => {
+try {
+const data = JSON.parse(message.payloadString);
+updateRoomDisplay(data.room, data);
+} catch(e) {
+console.error('Invalid JSON:', message.payloadString);
+}
+}
+};
+
+// Room configurations with air quality elements, (change humidity?)
+const rooms = {
+'living-room': { name: 'Living Room', sensors: ['pm25', 'co2', 'temp', 'humidity'] },
+'bedroom': { name: 'Bedroom', sensors: ['pm25', 'co2', 'temp', 'humidity'] },
+'kitchen': { name: 'Kitchen', sensors: ['pm25', 'co2', 'temp', 'humidity', 'voc'] }
+};
+
+// Air quality thresholds (μg/m³ for PM2.5, ppm for CO2)
+const thresholds = {
+pm25: { good: 12, moderate: 35, poor: 55 },
+co2: { good: 800, moderate: 1200, poor: 2000 },
+temp: { good: [18, 26], optimal: 22 },
+humidity: { good: [30, 60] },
+voc: { good: 0.5, moderate: 1.0, poor: 2.0 }
+};
+
+let lastUpdate = {};
+
+// Initialize rooms display
+function initRooms() {
+const roomsDiv = document.getElementById('rooms');
+Object.entries(rooms).forEach(([id, config]) => {
+const roomDiv = document.createElement('div');
+roomDiv.className = 'room-card';
+roomDiv.id = `room-${id}`;
+roomDiv.innerHTML = `
+<h2>${config.name}</h2>
+<div id="sensors-${id}" style="display: flex; flex-wrap: wrap; gap: 15px;"></div>
+<div class="last-update" id="last-update-${id}">No data received</div>
+`;
+roomsDiv.appendChild(roomDiv);
+});
+}
+
+// Update room sensor display once in a while
+function updateRoomDisplay(roomId, data) {
+const sensorsDiv = document.getElementById(`sensors-${roomId}`);
+const updateDiv = document.getElementById(`last-update-${roomId}`);
+
+sensorsDiv.innerHTML = '';
+Object.entries(data.sensors).forEach(([sensor, value]) => {
+const sensorDiv = createSensorDisplay(sensor, value);
+sensorsDiv.appendChild(sensorDiv);
+});
+
+lastUpdate[roomId] = new Date().toLocaleTimeString();
+updateDiv.textContent = `Last update: ${lastUpdate[roomId]}`;
+}
+
+// Create individual sensor display
+function createSensorDisplay(sensor, value) {
+const div = document.createElement('div');
+div.style.flex = '1';
+div.style.minWidth = '120px';
+div.style.textAlign = 'center';
+
+const unit = getUnit(sensor);
+const status = getAirQualityStatus(sensor, value);
+const icon = getSensorIcon(sensor);
+
+div.innerHTML = `
+  <div style="font-size: 0.9em; opacity: 0.8;">${icon} ${sensor.toUpperCase()}</div>
+  <div class="sensor-value ${status}">${value.toFixed(1)}${unit}</div>
+  <div class="status-badge ${status}">${status.toUpperCase()}</div>
+`;
+return div;
+}
+
+// Get sensor unit, transfer to main code too
+function getUnit(sensor) {
+const units = {
+pm25: 'μg/m³', co2: 'ppm', temp: '°C', humidity: '%', voc: 'ppm'
+};
+return units[sensor] || '';
+}
+
+// Determine air quality status
+function getAirQualityStatus(sensor, value) {
+const th = thresholds[sensor];
+if (!th) return 'good';
+
+if (sensor === 'temp') {
+return (value >= 18 && value <= 26) ? 'good' : 'poor';
+}
+if (sensor === 'humidity') {
+return (value >= 30 && value <= 60) ? 'good' : 'poor';
+}
+
+if (value <= th.good) return 'good';
+if (value <= th.moderate) return 'moderate';
+return 'poor';
+}
+
+// Sensor icons
+function getSensorIcon(sensor) {
+const icons = {
+pm25: '🌫️', co2: '💨', temp: '🌡️', humidity: '💧', voc: '😷'
+};
+return icons[sensor] || '📊';
+}
+
+// Simulate MQTT sensor data ( testing)
+function simulateSensorData() {
+Object.entries(rooms).forEach(([roomId]) => {
+const data = {
+room: roomId,
+sensors: {
+pm25: 8 + Math.random() * 40,
+co2: 400 + Math.random() * 1200,
+temp: 18 + Math.random() * 10,
+humidity: 30 + Math.random() * 40
+}
+};
+if (roomId === 'kitchen') {
+data.sensors.voc = Math.random() * 2;
+}
+
+// Simulate MQTT message
+const mockMessage = { payloadString: JSON.stringify(data) };
+mqttClient.onMessageArrived(mockMessage);
+});
+}
+
+// controls :P
+document.getElementById('connectBtn').addEventListener('click', () => {
+if (!mqttClient.isConnected) {
+mqttClient.connect();
+} else {
+mqttClient.isConnected = false;
+updateStatus('Disconnected');
+document.getElementById('testBtn').disabled = true;
+}
+});
+
+document.getElementById('testBtn').addEventListener('click', simulateSensorData);
+
+function updateStatus(status) {
+document.getElementById('connectionStatus').textContent = status;
+}
+
+// Initialize
+initRooms();
+console.log('Air Quality Monitor ready. Click "Connect MQTT" to start simulation.');
+</script>
+</body>
+</html>

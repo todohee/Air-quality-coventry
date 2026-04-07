@@ -1,0 +1,96 @@
+import pygame
+import paho.mqtt.client as mqtt
+import threading
+
+
+# Initialize pygame
+
+pygame.init()
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Room Quality Dashboard (MQTT)")
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 100, 100)
+BLUE = (100, 100, 255)
+GREEN = (100, 255, 100)
+
+# Fonts
+font = pygame.font.SysFont("Arial", 36)
+
+# Global variables for sensor data
+
+temperature = 0
+humidity = 0
+co2 = 0
+
+
+# MQTT callback
+
+def on_message(client, userdata, message):
+    global temperature, humidity, co2
+    topic = message.topic
+    try:
+        value = float(message.payload.decode())
+        if topic == "room1/temperature":
+            temperature = value
+        elif topic == "room1/humidity":
+            humidity = value
+        elif topic == "room1/co2":
+            co2 = value
+    except:
+        print(f"Invalid payload: {message.payload}")
+
+
+# Connect to MQTT broker
+
+MQTT_BROKER = "broker.hivemq.com"  
+client = mqtt.Client()
+client.on_message = on_message
+client.connect(MQTT_BROKER, 1883, 60)
+
+# Subscribe to topics
+client.subscribe("room1/temperature")
+client.subscribe("room1/humidity")
+client.subscribe("room1/co2")
+
+
+threading.Thread(target=client.loop_forever, daemon=True).start()
+
+
+# Function to draw sensor bars
+
+def draw_bars():
+    # Temperture bar
+    pygame.draw.rect(screen, RED, (50, 150, temperature * 10, 40))
+    temp_text = font.render(f"Temperature: {temperature:.1f}°C", True, BLACK)
+    screen.blit(temp_text, (50, 100))
+
+    # Humidity bar
+    pygame.draw.rect(screen, BLUE, (50, 300, humidity * 10, 40))
+    hum_text = font.render(f"Humidity: {humidity:.1f}%", True, BLACK)
+    screen.blit(hum_text, (50, 250))
+
+    # CO2 bar
+    pygame.draw.rect(screen, GREEN, (50, 450, co2 / 10, 40))
+    co2_text = font.render(f"CO2: {co2:.0f} ppm", True, BLACK)
+    screen.blit(co2_text, (50, 400))
+
+
+# Main pygame loop
+
+running = True
+while running:
+    screen.fill(WHITE)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    draw_bars()
+    pygame.display.flip()
+    pygame.time.delay(100)
+
+pygame.quit()

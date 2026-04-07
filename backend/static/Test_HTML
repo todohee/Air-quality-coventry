@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Air Quality Backend</title>
+  </head>
+  <body>
+    <h1>Air Quality Backend</h1>
+    <p>This is a minimal placeholder UI. Replace with your real frontend in <code>backend/static/</code>.</p>
+    <p>Link to Github: <a href="https://github.com/todohee/Air-quality-coventry/blob/todohee-patch-2/backend/static/index.html">Curently unavailable</a></p>
+    <p style="text-align:center; font-size:160%;">Gym.</p>
+    <p style="text-align:center;" style="color:green;">Air quality: good.</p>
+    <p style="text-align:center;" style="color:green;">CO2 level: 230.94.</p>
+    <p style="text-align:center;" style="color:green;">Humidity level: .</p>
+
+    <img src="https://avatars.mds.yandex.net/i?id=ca305d56d1c34182984bd29ccc6ef95112906597-13323380-images-thumbs&n=13.jpg" width="50" height="20"> (change image)
+  </body>
+</html>
