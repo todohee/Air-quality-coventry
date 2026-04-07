@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Room Air Quality Monitor</title>
 <script src="https://unpkg.com/paho-mqtt@1.0.1/paho-mqtt.min.js"></script>
+
+<!-- maybe shift around the simulation-->
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -72,13 +74,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 </div>
 
 <script>
-// Simulated MQTT client (no real connection)
+// Simulated MQTT client, no real connection (note to self:clean up code)
+
 let mqttClient = {
 isConnected: false,
 connect: () => {
 mqttClient.isConnected = true;
 updateStatus('Connected ✓');
 document.getElementById('testBtn').disabled = false;
+
 // Simulate periodic test data
 setInterval(simulateSensorData, 5000);
 },
@@ -93,7 +97,7 @@ console.error('Invalid JSON:', message.payloadString);
 }
 };
 
-// Room configurations with air quality thresholds
+// Room configurations with air quality elements, (change humidity?)
 const rooms = {
 'living-room': { name: 'Living Room', sensors: ['pm25', 'co2', 'temp', 'humidity'] },
 'bedroom': { name: 'Bedroom', sensors: ['pm25', 'co2', 'temp', 'humidity'] },
@@ -127,7 +131,7 @@ roomsDiv.appendChild(roomDiv);
 });
 }
 
-// Update room sensor display
+// Update room sensor display once in a while
 function updateRoomDisplay(roomId, data) {
 const sensorsDiv = document.getElementById(`sensors-${roomId}`);
 const updateDiv = document.getElementById(`last-update-${roomId}`);
@@ -161,7 +165,7 @@ div.innerHTML = `
 return div;
 }
 
-// Get sensor unit
+// Get sensor unit, transfer to main code too
 function getUnit(sensor) {
 const units = {
 pm25: 'μg/m³', co2: 'ppm', temp: '°C', humidity: '%', voc: 'ppm'
@@ -194,7 +198,7 @@ pm25: '🌫️', co2: '💨', temp: '🌡️', humidity: '💧', voc: '😷'
 return icons[sensor] || '📊';
 }
 
-// Simulate MQTT sensor data (for testing)
+// Simulate MQTT sensor data ( testing)
 function simulateSensorData() {
 Object.entries(rooms).forEach(([roomId]) => {
 const data = {
@@ -216,7 +220,7 @@ mqttClient.onMessageArrived(mockMessage);
 });
 }
 
-// UI Controls
+// controls :P
 document.getElementById('connectBtn').addEventListener('click', () => {
 if (!mqttClient.isConnected) {
 mqttClient.connect();
@@ -238,10 +242,4 @@ initRooms();
 console.log('Air Quality Monitor ready. Click "Connect MQTT" to start simulation.');
 </script>
 </body>
-</html>
-
-
-
-
-Sen
 </html>
