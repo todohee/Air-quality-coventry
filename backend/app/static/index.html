@@ -8,6 +8,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
+/*body design*/
+
 body {
   font-family: Arial;
   max-width: 1000px;
@@ -34,6 +36,7 @@ body {
   font-size:2em;
   font-weight:bold;
 }
+/* color for sensors */
 
 .good {color:#4CAF50;}
 .moderate {color:#FF9800;}
@@ -60,7 +63,7 @@ canvas {
   margin-top:20px;
 }
 
-/* ROOM VISUAL */
+/* room visuals */
 #roomVisual {
   width:100%;
   height:300px;
@@ -93,7 +96,7 @@ canvas {
 
 <script>
 
-// STATE 
+// room state 
 
 let roomState = {
   light:false,
@@ -109,7 +112,7 @@ let co2Data = [];
 let dustData = [];
 const maxPoints = 20;
 
-//  STATUS 
+//  checking sensors and status 
 
 function getStatus(sensor,value){
 
@@ -148,7 +151,7 @@ function icon(s){
   return {temperature:"🌡️",co2:"💨",dust:"🌫️",fire:"🔥",water:"💧"}[s];
 }
 
-//  SENSOR UI 
+//  ui for sensors 
 
 function sensorHTML(sensor,val){
 
@@ -164,7 +167,7 @@ function sensorHTML(sensor,val){
   `;
 }
 
-// CONTROLS 
+// control of buttons 
 
 function controls(){
   return `
@@ -178,7 +181,7 @@ function controls(){
   `;
 }
 
-//  COMMAND HANDLER 
+//  device control 
 
 function cmd(device){
 
@@ -197,7 +200,7 @@ function cmd(device){
   console.log("Command:",device);
 }
 
-//  ROOM VISUAL 
+//  room design(simple) 
 
 function renderRoomVisual(){
 
@@ -205,10 +208,10 @@ function renderRoomVisual(){
 
   el.innerHTML = "";
 
-  // LIGHT
+  // lightbulb
   el.style.background = roomState.light ? "#f5e6a3" : "#2c2f3a";
 
-  // WINDOW
+  // window(just a square)
   el.innerHTML += `
     <div style="
       position:absolute;
@@ -223,7 +226,7 @@ function renderRoomVisual(){
     "></div>
   `;
 
-  // AIRFLOW
+  // animation of air from vent
   if(roomState.vent){
     el.innerHTML += `
       <div style="
@@ -236,7 +239,7 @@ function renderRoomVisual(){
     `;
   }
 
-  // WATER
+  // water flowes
   el.innerHTML += `
     <div style="
       position:absolute;
@@ -249,7 +252,7 @@ function renderRoomVisual(){
     </div>
   `;
 
-  // ALERT
+  // fire in building
   if(roomState.alert){
     el.innerHTML += `
       <div style="
@@ -270,7 +273,7 @@ function renderRoomVisual(){
   }
 }
 
-// CHARTS 
+// charts 
 
 function initCharts(){
 
@@ -309,7 +312,7 @@ function updateCharts(co2,dust){
   dustChart.update();
 }
 
-//  FETCH 
+// fetching 
 
 async function fetchAndRender(){
 
@@ -343,7 +346,7 @@ async function fetchAndRender(){
   });
 }
 
-//  START 
+//  starting 
 
 initCharts();
 renderRoomVisual();
