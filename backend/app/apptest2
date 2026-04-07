@@ -4,9 +4,9 @@ import threading
 from collections import deque
 import math
 
-# -------------------------
+
 # PYGAME SETUP
-# -------------------------
+
 
 pygame.init()
 WIDTH, HEIGHT = 1000, 650
@@ -26,9 +26,9 @@ YELLOW = (255,200,50)
 RED = (255,90,90)
 BLUE = (90,150,255)
 
-# -------------------------
+
 # SENSOR DATA
-# -------------------------
+
 
 temperature = 0
 humidity = 0
@@ -37,9 +37,9 @@ vent_state = "OFF"
 
 co2_history = deque(maxlen=60)
 
-# -------------------------
+
 # MQTT SETUP
-# -------------------------
+
 
 BROKER = "broker.hivemq.com"
 
@@ -73,9 +73,7 @@ client.subscribe("room/co2")
 
 threading.Thread(target=client.loop_forever, daemon=True).start()
 
-# -------------------------
 # AIR QUALITY STATUS
-# -------------------------
 
 def air_quality():
 
@@ -89,9 +87,7 @@ def air_quality():
         return "BAD", RED
 
 
-# -------------------------
 # SENSOR BAR
-# -------------------------
 
 def draw_bar(label,value,max_value,y,color):
 
@@ -104,9 +100,8 @@ def draw_bar(label,value,max_value,y,color):
     screen.blit(text,(80,y-30))
 
 
-# -------------------------
 # CO2 GRAPH
-# -------------------------
+
 
 def draw_graph():
 
@@ -133,9 +128,7 @@ def draw_graph():
     pygame.draw.lines(screen,BLUE,False,points,3)
 
 
-# -------------------------
 # AIR QUALITY GAUGE
-# -------------------------
 
 def draw_gauge():
 
@@ -159,9 +152,8 @@ def draw_gauge():
     screen.blit(text,(630,300))
 
 
-# -------------------------
 # AUTO VENT CONTROL
-# -------------------------
+
 
 def auto_control():
 
@@ -176,16 +168,12 @@ def auto_control():
         vent_state = "OFF"
 
 
-# -------------------------
 # BUTTONS
-# -------------------------
 
 vent_on = pygame.Rect(450,580,120,45)
 vent_off = pygame.Rect(600,580,120,45)
 
-# -------------------------
 # MAIN LOOP
-# -------------------------
 
 clock = pygame.time.Clock()
 
