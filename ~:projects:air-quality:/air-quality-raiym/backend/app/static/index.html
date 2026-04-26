@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Air Quality Dashboard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Roboto, Arial; padding: 20px }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background: #f4f4f4; text-align: left }
+  </style>
+</head>
+<body>
+  <h1>Air Quality — Live</h1>
+  <p>Data is simulated and sent via MQTT by simulator programs.</p>
+  <table id="tbl">
+    <thead>
+      <tr><th>Sensor ID</th><th>Temperature (°C)</th><th>CO₂ (ppm)</th><th>Water Quality</th><th>Dust (µg/m³)</th><th>Last seen</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    async function fetchAndRender(){
+      try {
+        const res = await fetch('/sensors');
+        const data = await res.json();
+        const tbody = document.querySelector('#tbl tbody');
+        tbody.innerHTML = '';
+        Object.keys(data).forEach(id => {
+          const row = data[id];
+          const tr = document.createElement('tr');
+          const temp = row.temperature ?? '-';
+          const co2 = row.co2 ?? '-';
+          const wq = row.water_quality ?? '-';
+          const dust = row.dust ?? '-';
+          const last = row.last_seen ? new Date(row.last_seen * 1000).toLocaleTimeString() : '-';
+          tr.innerHTML = `<td>${id}</td><td>${temp}</td><td>${co2}</td><td>${wq}</td><td>${dust}</td><td>${last}</td>`;
+          tbody.appendChild(tr);
+        })
+      } catch (e){
+        console.error(e);
+      }
+    }
+    fetchAndRender();
+    setInterval(fetchAndRender, 2000);
+  </script>
+</body>
+</html>
